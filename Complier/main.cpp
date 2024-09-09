@@ -4,39 +4,23 @@
 #include <vector>
 using namespace std;
 
-enum SyntexKind
+enum TokenKind
 {
 	EndoffileToken,
 	Numbertoken,
 	whitespaceToken,
 	PlusToken,
 	minusToken,
-	MultiplyToken,
+	StarToken,
 	divisionToken,
 	badToken,
 	openparenthasisToken,
 	closeparenthasisToken,
+	NumberExpression,
+	BinaryExpression
 };
 
-class SyntaxToken
-{
-public:
-	SyntexKind Kind;
-	int Position;
-	string Text;
-	int Value;
-
-
-	SyntaxToken(SyntexKind kind, int position, string text, int value)
-	{
-		Kind = kind;
-		Position = position;
-		Text = text;
-		Value = value;
-	}
-};
-
-inline const char* ToString(SyntexKind color) {
+inline const char* ToString(TokenKind color) {
 	if (color == 0)
 	{
 		return "EndoffileToken";
@@ -79,9 +63,42 @@ inline const char* ToString(SyntexKind color) {
 	}
 }
 
+class SyntexNode
+{
+public:
+	TokenKind kind;
+	virtual TokenKind kindover() { return kind; };
+
+	virtual vector<SyntexNode> GetChildren();
+};
+
+class SyntexToken : SyntexNode
+{
+public:
+	TokenKind Kind;
+	int Position;
+	string Text;
+	int Value;
+
+	//SyntexToken() {} 
+	SyntexToken() = default;
+	SyntexToken(TokenKind kind, int position, string text, int value)
+	{
+		Kind = kind;
+		Position = position;
+		Text = text;
+		Value = value;
+	}
+
+	vector<SyntexNode> GetChildren() override
+	{
+		return vector<SyntexNode>();
+	}
+};
+
+// Lexar - it simply identify the type of token by traversing the whole string.
 class lexar
 {
-
 public:
 	string string_text;
 	int _position = 0;
@@ -89,29 +106,36 @@ public:
 	{
 		string_text = text;
 	}
+
+	// tells the current character at which the "_position" is at.
 	char current()
 	{
 		return string_text[_position];
 	}
 
+	// It increment the "_position" variable by 1 - which then point to next char.
 	void Next()
 	{
 		_position++;
 	}
 
-	SyntaxToken NextToken()
+
+	// This is the main game which detect the token in string and form syntexToken object to each.
+	SyntexToken NextToken()
 	{
 		// <number> 
 		// + - * / ( ) 
 		// whitespaces
+
+		//End of the file
 		if (_position >= string_text.length())
 		{
-			SyntexKind kk = EndoffileToken;
-			SyntaxToken object(kk, _position, "", NULL);
+			TokenKind kk = EndoffileToken;
+			SyntexToken object(kk, _position, "", NULL);
 			return object;
 		}
 
-
+		//Number
 		if (isdigit(current()))
 		{
 			int start = _position;
@@ -121,10 +145,11 @@ public:
 			int lenght = _position - start;
 			string text = string_text.substr(start, lenght);
 			int value = stoi(text);
-			SyntaxToken object(SyntexKind::Numbertoken, start, text, value);
+			SyntexToken object(TokenKind::Numbertoken, start, text, value);
 			return object;
 		}
 
+		// is a space 
 		if (isspace(current()))
 		{
 			int start = _position;
@@ -134,74 +159,179 @@ public:
 
 			int length = _position - start;
 			string text = string_text.substr(start, length);
-			SyntexKind kk = whitespaceToken;
-			SyntaxToken object(kk, _position, text, NULL);
+			SyntexToken object(TokenKind::whitespaceToken, _position, text, -1);
 			return object;
 		}
 
+		// '+' token
 		if (current() == '+')
 		{
-			SyntexKind kk = PlusToken;
-			SyntaxToken object(kk, _position++, "+", NULL);
+			TokenKind kk = PlusToken;
+			SyntexToken object(kk, _position++, "+", -1);
 			return object;
 		}
 
+		// '-' token 
 		else if (current() == '-')
 		{
-			SyntexKind kk = minusToken;
-			SyntaxToken object(kk, _position++, "-", NULL);
-			return object;
-		}
-		else if (current() == '*')
-		{
-			SyntexKind kk = MultiplyToken;
-			SyntaxToken object(kk, _position++, "*", NULL);
-			return object;
-		}
-		else if (current() == '/')
-		{
-			SyntexKind kk = divisionToken;
-			SyntaxToken object(kk, _position++, "/", NULL);
+			TokenKind kk = minusToken;
+			SyntexToken object(kk, _position++, "-", -1);
 			return object;
 		}
 
-		else if(current() == '(')
+		// '*' token 
+		else if (current() == '*')
 		{
-			SyntexKind kk = openparenthasisToken;
-			SyntaxToken object(kk, _position++, "(", NULL);
+			TokenKind kk = StarToken;
+			SyntexToken object(kk, _position++, "*", -1);
 			return object;
 		}
+
+		// '/' token
+		else if (current() == '/')
+		{
+			TokenKind kk = divisionToken;
+			SyntexToken object(kk, _position++, "/", -1);
+			return object;
+		}
+
+		// '(' token 
+		else if (current() == '(')
+		{
+			TokenKind kk = openparenthasisToken;
+			SyntexToken object(kk, _position++, "(", -1);
+			return object;
+		}
+
+		// ')' token
 		else if (current() == ')')
 		{
-			SyntexKind kk = closeparenthasisToken;
-			SyntaxToken object(kk, _position++, ")", NULL);
+			TokenKind kk = closeparenthasisToken;
+			SyntexToken object(kk, _position++, ")", -1);
 			return object;
 		}
+
+		// BadToken
 		else
 		{
-			SyntexKind kk = badToken;
-			SyntaxToken object(kk, _position++, "", NULL);
+			TokenKind kk = badToken;
+			SyntexToken object(kk, _position++, "", -1);
 			return object;
 		}
 	}
 };
 
+class ExpressionSyntex : SyntexNode
+{
+
+};
+
+class NumberExpressionSyntex : public ExpressionSyntex
+{
+public:
+	SyntexToken NumberToken;
+
+	NumberExpressionSyntex(SyntexToken numberToken)
+	{
+		NumberToken = numberToken;
+	}
+
+	TokenKind kindover() override { return TokenKind::NumberExpression; }
+
+	vector<SyntexNode> GetChildren() override
+	{
+		return NumberToken;
+	}
+};
+
+class BinaryExpressionSyntex : public ExpressionSyntex
+{
+public:
+	SyntexToken BinaryToken;
+	ExpressionSyntex Left;
+	ExpressionSyntex Right;
+	BinaryExpressionSyntex(ExpressionSyntex left, SyntexToken binaryToken, ExpressionSyntex right)
+	{
+		Left = left;
+		BinaryToken = binaryToken;
+		Right = right;
+	}
+
+	TokenKind kindover() override { return TokenKind::BinaryExpression; }
+};
+
 class Parsor
 {
 public:
-	vector<SyntaxToken> tokens;
+	vector<SyntexToken> tokens;
+	int _position;
 	Parsor(string text)
 	{
 		lexar Lexar(text);
-		SyntaxToken token = Lexar.NextToken();
+		SyntexToken token;
 		do
 		{
-			SyntaxToken token = Lexar.NextToken();
+			token = Lexar.NextToken();
 			if (token.Kind != 2 && token.Kind != 7)
 			{
 				tokens.push_back(token);
 			}
 		} while (token.Kind != 0);
+	}
+
+private:
+	SyntexToken giveMeThatToken(int offset)
+	{
+		int index = _position + offset;
+		if (offset >= (tokens.size() - 1))
+			return tokens[tokens.size() - 1];
+		return tokens[index];
+	}
+	SyntexToken currentToken()
+	{
+		return giveMeThatToken(0);
+	}
+
+	SyntexToken	NextToken()
+	{
+		SyntexToken current = currentToken();
+		_position++;
+		return current;
+	}
+
+	SyntexToken Match(TokenKind kind)
+	{
+		auto token = currentToken();
+		if (token.Kind == kind)
+		{
+			return NextToken();
+		}
+
+		SyntexToken object = SyntexToken(kind, token.Position, " ", -1);
+		return object;
+	}
+
+public:
+	ExpressionSyntex Parse()
+	{
+		auto left = ParsePrimaryExpression();
+
+		auto newToken = currentToken();
+
+		while (newToken.Kind == TokenKind::PlusToken || newToken.Kind == TokenKind::minusToken)
+		{
+			auto NextT = NextToken();
+			auto right = ParsePrimaryExpression();
+			left = BinaryExpressionSyntex(left, NextT, right);
+		}
+	}
+
+private:
+	ExpressionSyntex ParsePrimaryExpression()
+	{
+		auto numberToken = Match(TokenKind::Numbertoken);
+		NumberExpressionSyntex object = NumberExpressionSyntex(numberToken);
+		return object;
 	}
 };
 
@@ -213,23 +343,24 @@ void main()
 		string line;
 		getline(cin, line);
 
-		
+
 		if (line.empty())
 			return;
-		
+
 		lexar lexa(line);
-		while(true)
+		while (true)
 		{
-			SyntaxToken token = lexa.NextToken();
-			//cout << token.Text << endl;
-			SyntexKind kin = token.Kind;
+			SyntexToken token = lexa.NextToken();
+			TokenKind kin = token.Kind;
 			if (kin == 0)
 				break;
 			//cout<< endl;
-			cout << ToString(kin) << ":" <<"'"<< token.Text <<"'"<< " " << token.Value << endl;
+			if (token.Value != -1)
+				cout << ToString(kin) << ":" << "'" << token.Text << "'" << " " << token.Value << endl;
+			else
+				cout << ToString(kin) << ":" << "'" << token.Text << "'" << endl;
 		}
 
 	}
 	return;
 }
-
